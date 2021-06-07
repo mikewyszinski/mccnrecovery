@@ -1,12 +1,24 @@
-export type YggCoin = {
-  amount?: string
-  chain?: string
-  symbol?: string
+import { Asset, BaseAmount } from '@xchainjs/xchain-util'
+
+export type RecoveryTransaction = {
+  toAsgardAddress: AsgardInboundAddress
+  fromYggAddress: string
+  amount: BaseAmount
+  asset: Asset
   contractAddress?: string
+  signedTxHex?: string
 }
-export type AsgardVault = {
+// export type AsgardVaultAddress = {
+//   chain: string
+//   address: string
+// }
+export type YggVaultAddress = {
   chain: string
   address: string
+}
+export type YggVault = {
+  coins: Array<Coin>
+  addresses: Array<YggVaultAddress>
 }
 export type AsgardInboundAddress = {
   chain: string
@@ -15,7 +27,8 @@ export type AsgardInboundAddress = {
   halted: boolean
   gas_rate: number
 }
-export type RecoveryTransaction = {
-  fromYgg: YggCoin
-  toAsgard: AsgardInboundAddress
+
+export type Coin = {
+  asset: string
+  amount: string
 }

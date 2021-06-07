@@ -32,6 +32,7 @@
     "coinselect": "^3.1.12",
     "console-table-printer": "^2.9.0",
     "cosmos-client": "0.39.2",
-    "wif": "^2.0.6"
+    "wif": "^2.0.6",
+    "xhr2": "^0.2.1"
   }
 }
