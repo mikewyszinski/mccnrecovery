@@ -3,20 +3,21 @@ import { Asset, BaseAmount } from '@xchainjs/xchain-util'
 export type RecoveryTransaction = {
   toAsgardAddress: AsgardInboundAddress
   fromYggAddress: string
-  amount: BaseAmount
+  memo: string
   asset: Asset
-  contractAddress?: string
+  amountToTransfer: BaseAmount
+  amountAvailable: BaseAmount
+  gas: number
+  // contractAddress?: string
   signedTxHex?: string
 }
-// export type AsgardVaultAddress = {
-//   chain: string
-//   address: string
-// }
 export type YggVaultAddress = {
   chain: string
   address: string
 }
 export type YggVault = {
+  pubKey: string
+  statusSince: string
   coins: Array<Coin>
   addresses: Array<YggVaultAddress>
 }

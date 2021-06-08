@@ -7,6 +7,7 @@ import split from 'coinselect/split'
 import { RootDerivationPaths } from '@xchainjs/xchain-client'
 import { RecoveryTransaction } from 'types'
 import { getSeed } from '@xchainjs/xchain-crypto'
+import { BaseAmount } from '@xchainjs/xchain-util'
 
 const THORCHAIN_DERIVATION_PATH: RootDerivationPaths = {
   testnet: "44'/931'/0'/0/0",
@@ -29,20 +30,14 @@ export class BTCTx {
       phrase: this.seed,
     })
   }
+  public async getBalance(address: Address): Promise<BaseAmount> {
+    const balance = await this.myBtcClient.getBalance(address)
+    return balance?.[0].amount
+  }
   public getAddress(): Address {
     return this.myBtcClient.getAddress()
   }
-  public async buildMoveAllTx(
-    tx: RecoveryTransaction,
-    // asset: Asset,
-    // sender: Address,
-    // recipient: Address,
-    // amount: BaseAmount,
-    // memo: string,
-    // feeRate: number,
-    // network,
-    // spendPendingUTXO = false, // default: prevent spending uncomfirmed UTXOs
-  ): Promise<Bitcoin.Psbt> {
+  public async buildMoveAllTx(tx: RecoveryTransaction): Promise<Bitcoin.Psbt> {
     try {
       const recipient = tx.toAsgardAddress.address
       const sender = tx.fromYggAddress

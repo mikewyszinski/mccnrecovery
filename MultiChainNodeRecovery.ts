@@ -1,36 +1,51 @@
-import { MultiChainClient } from './MultiChainClient'
+import { MultiChainClient2 } from './MultiChainClient2'
 import { AsgardInboundAddress, RecoveryTransaction, YggVaultAddress, YggVault } from './types'
-import { Network } from '@xchainjs/xchain-client'
+import { Address, Network } from '@xchainjs/xchain-client'
 import { ThornodeAPI } from './ThornodeAPI'
-import { Table } from 'console-table-printer'
 
-import { assetFromString, baseAmount } from '@xchainjs/xchain-util'
+import { assetFromString, baseAmount, Chain } from '@xchainjs/xchain-util'
 
-// this will recognize strings like ETH.ETH
-const COIN_REGEX = /(.+?)\.(.+?)$/
+// // this will recognize strings like ETH.ETH
+// const COIN_REGEX = /(.+?)\.(.+?)$/
 
-// this will recognize strings like ETH.DAI-0XAD6D458402F60FD3BD25163575031ACDCE07538D
-const COIN_REGEX_WITH_ADDRESS = /(.+?)\.(.+?)-(.+?)$/
+// // this will recognize strings like ETH.DAI-0XAD6D458402F60FD3BD25163575031ACDCE07538D
+// const COIN_REGEX_WITH_ADDRESS = /(.+?)\.(.+?)-(.+?)$/
 
 export class MultiChainNodeRecovery {
   private asgardInboundAddresses: AsgardInboundAddress[] | undefined
   private seedPhrase: string
-  private multiChainClient: MultiChainClient
+  private multiChainClient: MultiChainClient2
   private thornodeAPI: ThornodeAPI
 
   constructor(network: Network, seedPhrase: string) {
     this.seedPhrase = seedPhrase
-    this.multiChainClient = new MultiChainClient(this.seedPhrase, network)
+    this.multiChainClient = new MultiChainClient2(this.seedPhrase, network)
     this.thornodeAPI = new ThornodeAPI(network)
+
+    // TODO remove this after testing
+    // TODO remove this after testing
+    // TODO remove this after testing
+    console.log(this.multiChainClient.addresses)
+    const addresses: Map<Chain, Address> = new Map()
+    addresses.set('THOR', 'tthor1v2egkratjjxmmjgqjv5ekczwmt7df68wktm3qn')
+    addresses.set('LTC', 'tltc1qv2egkratjjxmmjgqjv5ekczwmt7df68w305ur7')
+    addresses.set('BTC', 'tb1qv2egkratjjxmmjgqjv5ekczwmt7df68wg8kznh')
+    addresses.set('BCH', 'qp3t9zc04w2gm0wfqzfjnxmqfmd0e48gacjkxvferc')
+    addresses.set('BNB', 'tbnb1v2egkratjjxmmjgqjv5ekczwmt7df68wc29jdk')
+    addresses.set('ETH', '0x5f7499cb53194542992f44151c9bea3f9fe8b163')
+    this.multiChainClient.addresses = addresses
+    // TODO remove this after testing
+    // TODO remove this after testing
+    // TODO remove this after testing
   }
 
   public async run(broadcastTxs = false): Promise<void> {
-    const myYggAddresses = await this.multiChainClient.generateYggAddresses()
-    console.log(`Looking for this Ygg Thor Address: ${myYggAddresses.THOR}`)
-    const transactionsToCreate = await this.getRecoveryTransactions(myYggAddresses.THOR)
+    const thorAddress = this.multiChainClient.addresses.get('THOR') || ''
+    console.log(`Looking for this Ygg Thor Address: ${thorAddress}`)
+    const transactionsToCreate = await this.getRecoveryTransactions(thorAddress)
 
-    this.printTransactionTable(transactionsToCreate)
-    this.printSignedTransactionHex(transactionsToCreate)
+    // this.printTransactionTable(transactionsToCreate)
+    this.printTransactionToProcess(transactionsToCreate)
     if (broadcastTxs) {
       //TODO create signed trxns to move funds for each ygg vault
     }
@@ -44,7 +59,12 @@ export class MultiChainNodeRecovery {
     // console.log(myYggVault)
     if (myYggVault) {
       for (const coin of myYggVault?.coins) {
-        const tx = await this.createRecoveryTransaction(coin.asset, coin.amount, myYggVault.addresses)
+        const tx = await this.createRecoveryTransaction(
+          coin.asset,
+          coin.amount,
+          myYggVault.statusSince,
+          myYggVault.addresses,
+        )
         txs.push(tx)
       }
     }
@@ -61,6 +81,8 @@ export class MultiChainNodeRecovery {
       if (addressMatched) {
         console.log(`Found Ygg Vault ${addressMatched.address}`)
         foundVault = {
+          pubKey: yggVault.pub_key,
+          statusSince: yggVault.status_since,
           coins: yggVault.coins,
           addresses: yggVault.addresses,
         }
@@ -79,14 +101,14 @@ export class MultiChainNodeRecovery {
     }
     return asgardInboundAddress
   }
-
   private async createRecoveryTransaction(
     assetString: string,
     amount: string,
+    statusSince: string,
     yggVaultAddresses: Array<YggVaultAddress>,
   ): Promise<RecoveryTransaction> {
-    const matches =
-      assetString.indexOf('-') >= 0 ? assetString.match(COIN_REGEX_WITH_ADDRESS) : assetString.match(COIN_REGEX)
+    // const matches =
+    //   assetString.indexOf('-') >= 0 ? assetString.match(COIN_REGEX_WITH_ADDRESS) : assetString.match(COIN_REGEX)
 
     // const chain = matches?.[1] || ''
 
@@ -107,53 +129,47 @@ export class MultiChainNodeRecovery {
       fromYggAddress: yggVault.address,
       toAsgardAddress: asgardDestination,
       asset,
-      amount: baseAmount(amount),
-      contractAddress: matches?.[3],
+      memo: `YGGDRASIL-:${statusSince}`,
+      amountToTransfer: baseAmount(amount),
+      amountAvailable: await this.multiChainClient.getAvailableBalance(asset),
+      gas: 10000,
+      // contractAddress: matches?.[3],
     }
     //add the signed tx
-    tx.signedTxHex = await this.multiChainClient.getSignedTxHex(tx)
+    // tx.signedTxHex = await this.multiChainClient.getSignedTxHex(tx)
     return tx
   }
-  private printTransactionTable(transactionsToCreate: Array<RecoveryTransaction>) {
-    const table = new Table({
-      title: 'Recovery Tanasctions To Execute', // A text showsup on top of table (optoinal)
-      columns: [
-        { name: 'Chain', color: 'white' }, // with alignment and color
-        { name: 'Asset', color: 'white' }, // with alignment and color
-        { name: 'From Node Address', color: 'white' }, // with alignment and color
-        { name: 'Asgard Address', color: 'white' }, // with alignment and color
-        { name: 'Gas Rate', color: 'white' }, // with alignment and color
-        // { name: 'Signed Tx(Hex)', color: 'white', maxLen: 60 }, // with alignment and color
-      ],
-      sort: (a, b) => a.Chain.localeCompare(b.Chain),
-    })
+
+  private printTransactionToProcess(transactionsToCreate: Array<RecoveryTransaction>) {
     for (const tx of transactionsToCreate) {
-      const row = {
-        Chain: tx.asset.chain,
-        Asset: `${tx.amount.amount()} ${tx.asset.ticker}`,
-        'From Node Address': tx.fromYggAddress,
-        'Asgard Address': tx.toAsgardAddress?.address,
-        'Gas Rate': tx.toAsgardAddress?.gas_rate,
-        // 'Signed Tx(Hex)': this.splitString(tx.signedTxHex, 60),
-      }
-      table.addRow(row)
-    }
-    table.printTable()
-  }
-  private printSignedTransactionHex(transactionsToCreate: Array<RecoveryTransaction>) {
-    for (const tx of transactionsToCreate) {
+      const amountToTransfer = tx.amountToTransfer.amount()
+      const amountAvailable = tx.amountAvailable.amount()
+      const gasToUse = tx.gas
+      const leftover = amountAvailable.minus(amountToTransfer.plus(gasToUse))
+      const feedback = leftover.gte(0) ? '✅' : '❌'
+
       console.log(`============================================================`)
-      console.log(`                    ${tx.asset.ticker}                    `)
+      console.log(`                    ${tx.asset.symbol}                    `)
       console.log(`============================================================`)
       console.log(`  From YggAddress: ${tx.fromYggAddress}`)
       console.log(`To Asgard Address: ${tx.toAsgardAddress.address}`)
-      console.log(`         Contract: ${tx.contractAddress}`)
-      console.log(`           Amount: ${tx.amount.amount()} ${tx.asset.ticker}`)
-      console.log(`    Signed TX Hex: ${tx.signedTxHex}`)
+      console.log(`             memo: ${tx.memo}`)
+      // console.log(`         Contract: ${tx.contractAddress}`)
+      console.log(`        Available:  ${amountAvailable}`)
+      console.log(`   Amount To Send: -${amountToTransfer}`)
+      console.log(`       Gas To Use: -${gasToUse}`)
+      console.log(`                   --------------------`)
+      console.log(`         Leftover:  ${leftover}`)
+      // console.log(`    Signed TX Hex: ${tx.signedTxHex}`)
+      console.log(`   Ready To Send?: ${feedback}`)
       // console.log(`============================================================\n`)
       console.log(`\n\n`)
     }
   }
+
+  // https://api-ropsten.etherscan.io/api?module=account&action=tokenbalance&contractaddress=0XAD6D458402F60FD3BD25163575031ACDCE07538D&address=0x5f7499cb53194542992f44151c9bea3f9fe8b163&apiKey=9D13ZE7XSBTJ94N9BNJ2MA33VMAY2YPIRB
+  // https://api-ropsten.etherscan.io/api?module=account&action=tokenbalance&contractaddress=0XAD6D458402F60FD3BD25163575031ACDCE07538D&address=0XDA8086165E5B4FA1EB2AB27722339A6DB8EB7FAE&apiKey=9D13ZE7XSBTJ94N9BNJ2MA33VMAY2YPIRB
+  // https://api-ropsten.etherscan.io/api?module=account&action=tokenbalance&contractaddress=0XAD6D458402F60FD3BD25163575031ACDCE07538D&address=0xe0a63488e677151844e70623533c22007dc57c9e&apiKey=9D13ZE7XSBTJ94N9BNJ2MA33VMAY2YPIRB
 
   // private splitString(str = '', length: number) {
   //   let out = ''
@@ -164,3 +180,4 @@ export class MultiChainNodeRecovery {
   //   return out
   // }
 }
+// no DAI balance on the yggaddress -> https://ropsten.etherscan.io/token/0xad6d458402f60fd3bd25163575031acdce07538d?a=0x5f7499cb53194542992f44151c9bea3f9fe8b163
