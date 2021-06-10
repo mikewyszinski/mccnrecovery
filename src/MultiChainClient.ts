@@ -1,7 +1,7 @@
 import { Network } from '@xchainjs/xchain-client'
 import { BTCTx } from './BTCTx'
 
-import { RecoveryTransaction } from 'types'
+import { RecoveryTransaction } from './types'
 import { BaseAmount, baseAmount } from '@xchainjs/xchain-util'
 import { Asset } from '@xchainjs/xchain-util'
 // import { assetFromString,  } from '@xchainjs/xchain-util'

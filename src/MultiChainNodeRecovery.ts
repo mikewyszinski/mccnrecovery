@@ -1,5 +1,5 @@
 import { MultiChainClient2 } from './MultiChainClient2'
-import { AsgardInboundAddress, RecoveryTransaction, YggVaultAddress, YggVault } from './types'
+import { AsgardInboundAddress, RecoveryTransaction, YggVaultAddress, YggVault, isTransactionValid } from './types'
 import { Address, Network } from '@xchainjs/xchain-client'
 import { ThornodeAPI } from './ThornodeAPI'
 
@@ -10,7 +10,12 @@ import { assetFromString, baseAmount, Chain } from '@xchainjs/xchain-util'
 
 // // this will recognize strings like ETH.DAI-0XAD6D458402F60FD3BD25163575031ACDCE07538D
 // const COIN_REGEX_WITH_ADDRESS = /(.+?)\.(.+?)-(.+?)$/
-
+const isErc20 = (tx: RecoveryTransaction) => {
+  return tx.asset.chain === 'ETH' && tx.asset.ticker !== 'ETH'
+}
+const isNotErc20 = (tx: RecoveryTransaction) => {
+  return !(tx.asset.chain === 'ETH' && tx.asset.ticker !== 'ETH')
+}
 export class MultiChainNodeRecovery {
   private asgardInboundAddresses: AsgardInboundAddress[] | undefined
   private seedPhrase: string
@@ -39,17 +44,31 @@ export class MultiChainNodeRecovery {
     // TODO remove this after testing
   }
 
-  public async run(broadcastTxs = false): Promise<void> {
+  public async run(executeTransfer = false): Promise<void> {
     const thorAddress = this.multiChainClient.addresses.get('THOR') || ''
     console.log(`Looking for this Ygg Thor Address: ${thorAddress}`)
     const transactionsToCreate = await this.getRecoveryTransactions(thorAddress)
 
     // this.printTransactionTable(transactionsToCreate)
     this.printTransactionToProcess(transactionsToCreate)
-    if (broadcastTxs) {
-      //TODO create signed trxns to move funds for each ygg vault
+    if (executeTransfer) {
+      //check to make sure all txs are valid
+      for (const tx of transactionsToCreate) {
+        if (!isTransactionValid(tx)) {
+          throw new Error(`${tx.asset.symbol} not ready to process`)
+        }
+      }
+      const erc20s = transactionsToCreate.filter(isErc20)
+      const notErc20s = transactionsToCreate.filter(isNotErc20)
+
+      //TODO print out tx URLS
+      for (const tx of notErc20s) {
+        await this.multiChainClient.execute(tx)
+      }
+      await this.multiChainClient.executeERC20s(erc20s)
     }
   }
+
   private async getRecoveryTransactions(thorAddress: string): Promise<Array<RecoveryTransaction>> {
     const txs: Array<RecoveryTransaction> = []
     const myYggVault = await this.findMyYggVault(thorAddress)
@@ -107,11 +126,6 @@ export class MultiChainNodeRecovery {
     statusSince: string,
     yggVaultAddresses: Array<YggVaultAddress>,
   ): Promise<RecoveryTransaction> {
-    // const matches =
-    //   assetString.indexOf('-') >= 0 ? assetString.match(COIN_REGEX_WITH_ADDRESS) : assetString.match(COIN_REGEX)
-
-    // const chain = matches?.[1] || ''
-
     const asset = assetFromString(assetString)
     if (!asset) {
       throw new Error(`Could not parse ${assetString}`)
@@ -133,7 +147,6 @@ export class MultiChainNodeRecovery {
       amountToTransfer: baseAmount(amount),
       amountAvailable: await this.multiChainClient.getAvailableBalance(asset),
       gas: 10000,
-      // contractAddress: matches?.[3],
     }
     //add the signed tx
     // tx.signedTxHex = await this.multiChainClient.getSignedTxHex(tx)

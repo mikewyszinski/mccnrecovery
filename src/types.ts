@@ -8,8 +8,8 @@ export type RecoveryTransaction = {
   amountToTransfer: BaseAmount
   amountAvailable: BaseAmount
   gas: number
-  // contractAddress?: string
-  signedTxHex?: string
+
+  // signedTxHex?: string
 }
 export type YggVaultAddress = {
   chain: string
@@ -32,4 +32,8 @@ export type AsgardInboundAddress = {
 export type Coin = {
   asset: string
   amount: string
+}
+
+export function isTransactionValid(tx: RecoveryTransaction): boolean {
+  return tx.amountAvailable.minus(tx.amountToTransfer.plus(tx.gas)).gte(0)
 }

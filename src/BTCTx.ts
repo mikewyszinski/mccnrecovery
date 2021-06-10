@@ -5,7 +5,7 @@ import { Client as BtcClient, scanUTXOs, UTXO, validateAddress, broadcastTx } fr
 // @ts-ignore
 import split from 'coinselect/split'
 import { RootDerivationPaths } from '@xchainjs/xchain-client'
-import { RecoveryTransaction } from 'types'
+import { RecoveryTransaction } from './types'
 import { getSeed } from '@xchainjs/xchain-crypto'
 import { BaseAmount } from '@xchainjs/xchain-util'
 
