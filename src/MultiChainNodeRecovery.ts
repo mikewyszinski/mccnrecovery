@@ -5,17 +5,9 @@ import { ThornodeAPI } from './ThornodeAPI'
 
 import { assetFromString, baseAmount, Chain } from '@xchainjs/xchain-util'
 
-// // this will recognize strings like ETH.ETH
-// const COIN_REGEX = /(.+?)\.(.+?)$/
+const isErc20 = (tx: RecoveryTransaction) =>  tx.asset.chain === 'ETH' && tx.asset.ticker !== 'ETH'
+const isNotErc20 = (tx: RecoveryTransaction) => !isErc20(tx)
 
-// // this will recognize strings like ETH.DAI-0XAD6D458402F60FD3BD25163575031ACDCE07538D
-// const COIN_REGEX_WITH_ADDRESS = /(.+?)\.(.+?)-(.+?)$/
-const isErc20 = (tx: RecoveryTransaction) => {
-  return tx.asset.chain === 'ETH' && tx.asset.ticker !== 'ETH'
-}
-const isNotErc20 = (tx: RecoveryTransaction) => {
-  return !(tx.asset.chain === 'ETH' && tx.asset.ticker !== 'ETH')
-}
 export class MultiChainNodeRecovery {
   private asgardInboundAddresses: AsgardInboundAddress[] | undefined
   private seedPhrase: string
@@ -49,7 +41,6 @@ export class MultiChainNodeRecovery {
     console.log(`Looking for this Ygg Thor Address: ${thorAddress}`)
     const transactionsToCreate = await this.getRecoveryTransactions(thorAddress)
 
-    // this.printTransactionTable(transactionsToCreate)
     this.printTransactionToProcess(transactionsToCreate)
     if (executeTransfer) {
       //check to make sure all txs are valid
@@ -179,18 +170,4 @@ export class MultiChainNodeRecovery {
       console.log(`\n\n`)
     }
   }
-
-  // https://api-ropsten.etherscan.io/api?module=account&action=tokenbalance&contractaddress=0XAD6D458402F60FD3BD25163575031ACDCE07538D&address=0x5f7499cb53194542992f44151c9bea3f9fe8b163&apiKey=9D13ZE7XSBTJ94N9BNJ2MA33VMAY2YPIRB
-  // https://api-ropsten.etherscan.io/api?module=account&action=tokenbalance&contractaddress=0XAD6D458402F60FD3BD25163575031ACDCE07538D&address=0XDA8086165E5B4FA1EB2AB27722339A6DB8EB7FAE&apiKey=9D13ZE7XSBTJ94N9BNJ2MA33VMAY2YPIRB
-  // https://api-ropsten.etherscan.io/api?module=account&action=tokenbalance&contractaddress=0XAD6D458402F60FD3BD25163575031ACDCE07538D&address=0xe0a63488e677151844e70623533c22007dc57c9e&apiKey=9D13ZE7XSBTJ94N9BNJ2MA33VMAY2YPIRB
-
-  // private splitString(str = '', length: number) {
-  //   let out = ''
-  //   const matches = str.match(new RegExp('.{1,' + length + '}', 'g')) || []
-  //   for (const match of matches) {
-  //     out = out + match + ' '
-  //   }
-  //   return out
-  // }
 }
-// no DAI balance on the yggaddress -> https://ropsten.etherscan.io/token/0xad6d458402f60fd3bd25163575031acdce07538d?a=0x5f7499cb53194542992f44151c9bea3f9fe8b163
