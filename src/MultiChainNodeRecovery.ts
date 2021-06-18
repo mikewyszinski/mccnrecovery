@@ -1,9 +1,9 @@
 import { MultiChainClient2 } from './MultiChainClient2'
 import { AsgardInboundAddress, RecoveryTransaction, YggVault, YggCoin } from './types'
-import { Address, Network } from '@xchainjs/xchain-client'
+import { Network } from '@xchainjs/xchain-client'
 import { ThornodeAPI } from './ThornodeAPI'
 
-import { assetFromString, baseAmount, Chain, BaseAmount, Asset } from '@xchainjs/xchain-util'
+import { assetFromString, baseAmount, BaseAmount, Asset } from '@xchainjs/xchain-util'
 import { BigNumber } from 'bignumber.js'
 
 const THORCHAIN_DECIMALS = 8
@@ -13,37 +13,19 @@ const isNotErc20 = (tx: RecoveryTransaction) => !isErc20(tx)
 export class MultiChainNodeRecovery {
   private asgardInboundAddresses: AsgardInboundAddress[] | undefined
   private seedPhrase: string
-  private multiChainClient: MultiChainClient2
+  private _multiChainClient: MultiChainClient2
+  public get multiChainClient(): MultiChainClient2 {
+    return this._multiChainClient
+  }
   private thornodeAPI: ThornodeAPI
 
   constructor(network: Network, seedPhrase: string) {
     this.seedPhrase = seedPhrase
-    this.multiChainClient = new MultiChainClient2(this.seedPhrase, network)
+    this._multiChainClient = new MultiChainClient2(this.seedPhrase, network)
     this.thornodeAPI = new ThornodeAPI(network)
-
-    // TODO remove this after testing
-    // TODO remove this after testing
-    // TODO remove this after testing
-    // console.log(this.multiChainClient.addresses)
-    const addresses: Map<Chain, Address> = new Map()
-    addresses.set('THOR', 'tthor1smacug88mxwh0drdgp8tythjy4jj4f7dlahl36')
-    addresses.set('LTC', 'tltc1qsmacug88mxwh0drdgp8tythjy4jj4f7dcecjjh')
-    addresses.set('BTC', 'tb1qsmacug88mxwh0drdgp8tythjy4jj4f7dp36vz7')
-    addresses.set('BCH', 'qzr0hr3qulve6aa5d4qyav3w7gjk2248e5ln4rhnue')
-    addresses.set('BNB', 'tbnb1smacug88mxwh0drdgp8tythjy4jj4f7d3ufuul')
-    addresses.set('ETH', '0x997575001f55abdb8bda4dd98001083e208142e6')
-
-    addresses.set('THOR', 'tthor1gsmzmhnn59qcsfcmz44rhr6zgvzy69kzdxw4me')
-    addresses.set('LTC', 'tltc1qgsmzmhnn59qcsfcmz44rhr6zgvzy69kz2zpcc5')
-    addresses.set('BTC', 'tb1qgsmzmhnn59qcsfcmz44rhr6zgvzy69kzn2rxga')
-    addresses.set('BCH', 'qpzrvtw7wws5rzp8rv2k5wu0gfpsgngkcgra36neg0')
-    addresses.set('BNB', 'tbnb1gsmzmhnn59qcsfcmz44rhr6zgvzy69kzr8skku')
-    addresses.set('ETH', '0xcf12e7d8b6f46e687de043cdad2aada104cae29a')
-
-    this.multiChainClient.addresses = addresses
-    // TODO remove this after testing
-    // TODO remove this after testing
-    // TODO remove this after testing
+    console.log(`==========================================================`)
+    console.log(`               MultiChainNodeRecovery: ${network.toUpperCase()}       `)
+    console.log(`==========================================================`)
   }
 
   public async run(executeTransfer = false): Promise<void> {
