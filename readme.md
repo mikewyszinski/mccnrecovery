@@ -5,6 +5,7 @@
 
    ```typescript
    // example
+   import { MultiChainNodeRecovery } from './MultiChainNodeRecovery'
    const nodeSeedPhrase = 'float next auto secret mixed nice comic december cycle curious essay priority'
    const network = 'testnet'
    const broadcastTxs = false
