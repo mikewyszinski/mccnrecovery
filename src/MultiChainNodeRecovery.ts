@@ -1,11 +1,13 @@
 import { MultiChainClient2 } from './MultiChainClient2'
-import { AsgardInboundAddress, RecoveryTransaction, YggVaultAddress, YggVault, isTransactionValid } from './types'
+import { AsgardInboundAddress, RecoveryTransaction, YggVault, YggCoin } from './types'
 import { Address, Network } from '@xchainjs/xchain-client'
 import { ThornodeAPI } from './ThornodeAPI'
 
-import { assetFromString, baseAmount, Chain } from '@xchainjs/xchain-util'
+import { assetFromString, baseAmount, Chain, BaseAmount, Asset } from '@xchainjs/xchain-util'
+import { BigNumber } from 'bignumber.js'
 
-const isErc20 = (tx: RecoveryTransaction) =>  tx.asset.chain === 'ETH' && tx.asset.ticker !== 'ETH'
+const THORCHAIN_DECIMALS = 8
+const isErc20 = (tx: RecoveryTransaction) => tx.asset.chain === 'ETH' && tx.asset.ticker !== 'ETH'
 const isNotErc20 = (tx: RecoveryTransaction) => !isErc20(tx)
 
 export class MultiChainNodeRecovery {
@@ -22,14 +24,22 @@ export class MultiChainNodeRecovery {
     // TODO remove this after testing
     // TODO remove this after testing
     // TODO remove this after testing
-    console.log(this.multiChainClient.addresses)
+    // console.log(this.multiChainClient.addresses)
     const addresses: Map<Chain, Address> = new Map()
-    addresses.set('THOR', 'tthor1v2egkratjjxmmjgqjv5ekczwmt7df68wktm3qn')
-    addresses.set('LTC', 'tltc1qv2egkratjjxmmjgqjv5ekczwmt7df68w305ur7')
-    addresses.set('BTC', 'tb1qv2egkratjjxmmjgqjv5ekczwmt7df68wg8kznh')
-    addresses.set('BCH', 'qp3t9zc04w2gm0wfqzfjnxmqfmd0e48gacjkxvferc')
-    addresses.set('BNB', 'tbnb1v2egkratjjxmmjgqjv5ekczwmt7df68wc29jdk')
-    addresses.set('ETH', '0x5f7499cb53194542992f44151c9bea3f9fe8b163')
+    addresses.set('THOR', 'tthor1smacug88mxwh0drdgp8tythjy4jj4f7dlahl36')
+    addresses.set('LTC', 'tltc1qsmacug88mxwh0drdgp8tythjy4jj4f7dcecjjh')
+    addresses.set('BTC', 'tb1qsmacug88mxwh0drdgp8tythjy4jj4f7dp36vz7')
+    addresses.set('BCH', 'qzr0hr3qulve6aa5d4qyav3w7gjk2248e5ln4rhnue')
+    addresses.set('BNB', 'tbnb1smacug88mxwh0drdgp8tythjy4jj4f7d3ufuul')
+    addresses.set('ETH', '0x997575001f55abdb8bda4dd98001083e208142e6')
+
+    addresses.set('THOR', 'tthor1gsmzmhnn59qcsfcmz44rhr6zgvzy69kzdxw4me')
+    addresses.set('LTC', 'tltc1qgsmzmhnn59qcsfcmz44rhr6zgvzy69kz2zpcc5')
+    addresses.set('BTC', 'tb1qgsmzmhnn59qcsfcmz44rhr6zgvzy69kzn2rxga')
+    addresses.set('BCH', 'qpzrvtw7wws5rzp8rv2k5wu0gfpsgngkcgra36neg0')
+    addresses.set('BNB', 'tbnb1gsmzmhnn59qcsfcmz44rhr6zgvzy69kzr8skku')
+    addresses.set('ETH', '0xcf12e7d8b6f46e687de043cdad2aada104cae29a')
+
     this.multiChainClient.addresses = addresses
     // TODO remove this after testing
     // TODO remove this after testing
@@ -45,7 +55,7 @@ export class MultiChainNodeRecovery {
     if (executeTransfer) {
       //check to make sure all txs are valid
       for (const tx of transactionsToCreate) {
-        if (!isTransactionValid(tx)) {
+        if (!this.isTransactionValid(tx)) {
           throw new Error(`${tx.asset.symbol} not ready to process`)
         }
       }
@@ -56,49 +66,88 @@ export class MultiChainNodeRecovery {
       for (const tx of notErc20s) {
         await this.multiChainClient.execute(tx)
       }
-      await this.multiChainClient.executeERC20s(erc20s)
+      await this.multiChainClient.returnERC20s(erc20s)
     }
+  }
+
+  private isTransactionValid(tx: RecoveryTransaction): boolean {
+    // return tx.amountAvailable.minus(tx.amountToTransfer.plus(tx.gas)).gte(0)
+    return tx.amountAvailable.minus(tx.amountToTransfer).gte(0)
   }
 
   private async getRecoveryTransactions(thorAddress: string): Promise<Array<RecoveryTransaction>> {
     const txs: Array<RecoveryTransaction> = []
     const myYggVault = await this.findMyYggVault(thorAddress)
-    if (!myYggVault)
-      throw new Error(`Could not find a matching Ygg vault for: ${thorAddress}. Did you input the correct seed?`)
 
-    // console.log(myYggVault)
-    if (myYggVault) {
-      for (const coin of myYggVault?.coins) {
-        const tx = await this.createRecoveryTransaction(
-          coin.asset,
-          coin.amount,
-          myYggVault.statusSince,
-          myYggVault.addresses,
-        )
+    for (const coin of myYggVault?.coins) {
+      if (coin.amount.gt(0)) {
+        const tx = await this.createRecoveryTransaction(coin, myYggVault.statusSince)
         txs.push(tx)
+      } else {
+        console.log(`Nothing to send back to asgard for ${coin.asset.symbol}, skipping...`)
       }
     }
     return txs
   }
-
-  private async findMyYggVault(thorAddress: string): Promise<YggVault | undefined> {
-    const allYggVaults = await this.thornodeAPI.getAllYggVaults()
-    let foundVault = undefined
-    for (const yggVault of allYggVaults) {
-      const addressMatched = yggVault.addresses.find((yggVaultAddress: YggVaultAddress) => {
-        return yggVaultAddress.chain === 'THOR' && yggVaultAddress.address === thorAddress
-      })
-      if (addressMatched) {
-        console.log(`Found Ygg Vault ${addressMatched.address}`)
-        foundVault = {
-          pubKey: yggVault.pub_key,
-          statusSince: yggVault.status_since,
-          coins: yggVault.coins,
-          addresses: yggVault.addresses,
-        }
-      }
+  /**
+   * Thorchain has a set decimal count of 8, this function pads/rounds the correct
+   * amount to send based on the chain
+   *
+   */
+  private getCorrectAmount(amount: string, asset: Asset, decimals: number | undefined): BaseAmount {
+    let decimalsToUse: number
+    if (asset.chain === 'ETH') {
+      decimalsToUse = decimals || 18
+    } else {
+      decimalsToUse = decimals || 8
     }
-    return foundVault
+    const amt: BigNumber = new BigNumber(amount)
+    const diff = decimalsToUse - THORCHAIN_DECIMALS
+    const amtToSend = amt.times(10 ** diff)
+    return baseAmount(amtToSend)
+  }
+
+  private async findMyYggVault(thorAddress: string): Promise<YggVault> {
+    const allYggVaults = await this.thornodeAPI.getAllYggVaults()
+    let foundVault: any
+    allYggVaults.forEach((vault) => {
+      const result = vault.addresses.find((item: any) => item.chain === 'THOR' && item.address === thorAddress)
+      if (result) {
+        foundVault = vault
+      }
+    })
+
+    if (!foundVault) {
+      throw new Error(`Couldn't find vault: ${thorAddress}`)
+    }
+    return this.createYggVault(foundVault)
+  }
+  /**
+   *
+   * Helper function to take the thornode API ygg vault and combine elements to make it easierto work with
+   *
+   * @param yggVault the ygg vault returned from thornodeAPI
+   * @returns YggVault
+   */
+  private createYggVault(yggVault: any): YggVault {
+    const coins: Array<YggCoin> = []
+    // console.log(JSON.stringify(yggVault))
+    yggVault.coins.forEach((coin: { asset: string; amount: string; decimals: number | undefined }) => {
+      const asset = assetFromString(coin.asset)
+      if (!asset) throw new Error(`Couldn't parse ${coin.asset}`)
+      const address = yggVault.addresses.find((item: any) => item.chain === asset?.chain).address
+      const amount = this.getCorrectAmount(coin.amount, asset, coin.decimals)
+      coins.push({
+        address,
+        asset,
+        amount,
+      })
+    })
+    return {
+      pubKey: yggVault.pub_key,
+      statusSince: yggVault.status_since,
+      coins,
+    }
   }
 
   private async findAsgardInboundAddress(chain: string): Promise<AsgardInboundAddress> {
@@ -111,36 +160,17 @@ export class MultiChainNodeRecovery {
     }
     return asgardInboundAddress
   }
-  private async createRecoveryTransaction(
-    assetString: string,
-    amount: string,
-    statusSince: string,
-    yggVaultAddresses: Array<YggVaultAddress>,
-  ): Promise<RecoveryTransaction> {
-    const asset = assetFromString(assetString)
-    if (!asset) {
-      throw new Error(`Could not parse ${assetString}`)
-    }
-
-    // find the assiocated address for the chain
-    const yggVault = yggVaultAddresses.find((yggVault) => asset.chain === yggVault.chain)
-    if (!yggVault) {
-      throw new Error(`Could not find address for ${asset.chain}`)
-    }
-
-    const asgardDestination = await this.findAsgardInboundAddress(asset.chain)
-
+  private async createRecoveryTransaction(coin: YggCoin, statusSince: string): Promise<RecoveryTransaction> {
+    const asgardDestination = await this.findAsgardInboundAddress(coin.asset.chain)
     const tx: RecoveryTransaction = {
-      fromYggAddress: yggVault.address,
+      fromYggAddress: coin.address,
       toAsgardAddress: asgardDestination,
-      asset,
+      asset: coin.asset,
       memo: `YGGDRASIL-:${statusSince}`,
-      amountToTransfer: baseAmount(amount),
-      amountAvailable: await this.multiChainClient.getAvailableBalance(asset),
-      gas: 10000,
+      amountToTransfer: coin.amount,
+      amountAvailable: await this.multiChainClient.getAvailableBalance(coin.asset),
+      // gas: 0,
     }
-    //add the signed tx
-    // tx.signedTxHex = await this.multiChainClient.getSignedTxHex(tx)
     return tx
   }
 
@@ -148,10 +178,11 @@ export class MultiChainNodeRecovery {
     for (const tx of transactionsToCreate) {
       const amountToTransfer = tx.amountToTransfer.amount()
       const amountAvailable = tx.amountAvailable.amount()
-      const gasToUse = tx.gas
-      const leftover = amountAvailable.minus(amountToTransfer.plus(gasToUse))
+      // const gasToUse = tx.gas
+      // const leftover = amountAvailable.minus(amountToTransfer.plus(gasToUse))
+      const leftover = amountAvailable.minus(amountToTransfer)
       const feedback = leftover.gte(0) ? '✅' : '❌'
-
+      // console.log(JSON.stringify(tx))
       console.log(`============================================================`)
       console.log(`                    ${tx.asset.symbol}                    `)
       console.log(`============================================================`)
@@ -159,11 +190,11 @@ export class MultiChainNodeRecovery {
       console.log(`To Asgard Address: ${tx.toAsgardAddress.address}`)
       console.log(`             memo: ${tx.memo}`)
       // console.log(`         Contract: ${tx.contractAddress}`)
-      console.log(`        Available:  ${amountAvailable}`)
-      console.log(`   Amount To Send: -${amountToTransfer}`)
-      console.log(`       Gas To Use: -${gasToUse}`)
-      console.log(`                   --------------------`)
-      console.log(`         Leftover:  ${leftover}`)
+      console.log(`        Available: ${amountAvailable}`)
+      console.log(`   Amount To Send: ${amountToTransfer}`)
+      // console.log(`       Gas To Use: -${gasToUse}`)
+      // console.log(`                   --------------------`)
+      // console.log(`         Leftover:  ${leftover}`)
       // console.log(`    Signed TX Hex: ${tx.signedTxHex}`)
       console.log(`   Ready To Send?: ${feedback}`)
       // console.log(`============================================================\n`)

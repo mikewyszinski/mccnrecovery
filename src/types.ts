@@ -1,25 +1,24 @@
+import { Address } from '@xchainjs/xchain-client'
 import { Asset, BaseAmount } from '@xchainjs/xchain-util'
 
 export type RecoveryTransaction = {
   toAsgardAddress: AsgardInboundAddress
-  fromYggAddress: string
-  memo: string
+  fromYggAddress: Address
   asset: Asset
   amountToTransfer: BaseAmount
   amountAvailable: BaseAmount
-  gas: number
-
-  // signedTxHex?: string
+  memo: string
+  // gas: number
 }
-export type YggVaultAddress = {
-  chain: string
-  address: string
+export type YggCoin = {
+  address: Address
+  asset: Asset
+  amount: BaseAmount
 }
 export type YggVault = {
   pubKey: string
   statusSince: string
-  coins: Array<Coin>
-  addresses: Array<YggVaultAddress>
+  coins: Array<YggCoin>
 }
 export type AsgardInboundAddress = {
   chain: string
@@ -27,13 +26,4 @@ export type AsgardInboundAddress = {
   address: string
   halted: boolean
   gas_rate: number
-}
-
-export type Coin = {
-  asset: string
-  amount: string
-}
-
-export function isTransactionValid(tx: RecoveryTransaction): boolean {
-  return tx.amountAvailable.minus(tx.amountToTransfer.plus(tx.gas)).gte(0)
 }

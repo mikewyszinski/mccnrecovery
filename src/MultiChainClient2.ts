@@ -1,7 +1,6 @@
 import { Client as BtcClient } from '@xchainjs/xchain-bitcoin'
 import { Client as BchClient } from '@xchainjs/xchain-bitcoincash'
 import { Client as EthClient, EthereumClient } from '@xchainjs/xchain-ethereum'
-import { ROUTER_ABI, ERC20 } from './abi'
 import { Client as ThorClient } from '@xchainjs/xchain-thorchain'
 import { Client as LtcClient } from '@xchainjs/xchain-litecoin'
 import { Client as BnbClient } from '@xchainjs/xchain-binance'
@@ -9,7 +8,8 @@ import { Address, Network, RootDerivationPaths, TxParams, XChainClient } from '@
 import { Asset, BaseAmount, baseAmount, Chain } from '@xchainjs/xchain-util'
 import { BigNumberish, BigNumber, ContractInterface } from 'ethers'
 import { RecoveryTransaction } from './types'
-// import BigNumber from 'bignumber.js'
+import { ROUTER_ABI, ERC20 } from './abi'
+import { BigNumber as BN } from 'bignumber.js'
 
 const THORCHAIN_DERIVATION_PATH: RootDerivationPaths = {
   testnet: "44'/931'/0'/0/0",
@@ -49,7 +49,7 @@ export class MultiChainClient2 {
   public set addresses(addresses: Map<Chain, Address>) {
     this._addresses = addresses
   }
-  public async execute(tx: RecoveryTransaction): Promise<void> {
+  public async execute(tx: RecoveryTransaction): Promise<string> {
     const client = this.clients.get(tx.asset.chain)
     const params: TxParams = {
       walletIndex: 0,
@@ -58,22 +58,19 @@ export class MultiChainClient2 {
       recipient: tx.toAsgardAddress.address,
       memo: tx.memo,
     }
-    client?.transfer(params)
+    return (await client?.transfer(params)) || 'error'
   }
-  public async executeERC20s(erc20txs: RecoveryTransaction[]): Promise<void> {
-    await this.returnVaultAssets(erc20txs)
-  }
+
   public async getAvailableBalance(asset: Asset): Promise<BaseAmount> {
     const client = this.clients.get(asset.chain)
     const yggVaultAddress = this.addresses.get(asset.chain) || ''
-
     if (asset.chain === 'ETH' && asset.ticker !== 'ETH') {
       //ERC20 coins have unique way to get vault balance
       const erc20Address = this.parseErc20Address(asset.symbol)
       const decimals = await this.getERC20Decimals(erc20Address)
       const amount = await this.getBalanceFromVault(yggVaultAddress, erc20Address)
-      console.log(`${amount.toString()} ${decimals}`)
-      return baseAmount(amount.toString(), decimals)
+
+      return baseAmount(amount.toFixed(decimals))
     } else {
       // all other coins can use the getBalance Function
       const balances = await client?.getBalance(yggVaultAddress, [asset])
@@ -93,37 +90,49 @@ export class MultiChainClient2 {
     }
     return addresses
   }
-  private async returnVaultAssets(erc20Txs: RecoveryTransaction[]): Promise<void> {
+  public async returnERC20s(erc20Txs: RecoveryTransaction[]): Promise<BN> {
     const network = this.clients?.get('ETH')?.getNetwork() || 'testnet'
     const routerContractAddress = ETH_ROUTER_ADDRESS[network]
-    const payableEthAmount = 'wtf is this?'
     const asgardAddress = erc20Txs?.[0].toAsgardAddress.address
     const memo = erc20Txs?.[0].memo
-
     const coinsTuple = this.buildCoinTuple(erc20Txs)
-    await this.ethClient.call<void>(0, routerContractAddress, this.routerContract, 'returnVaultAssets', [
-      payableEthAmount,
+    const walletIndex = 0 //always 0 index
+
+    const fees = await this.ethClient.estimateCall(routerContractAddress, this.routerContract, 'returnVaultAssets', [
       routerContractAddress,
       asgardAddress,
       coinsTuple,
       memo,
     ])
+
+    const tx = await this.ethClient.call<BigNumberish>(
+      walletIndex,
+      routerContractAddress,
+      this.routerContract,
+      'returnVaultAssets',
+      [fees.toNumber(), routerContractAddress, asgardAddress, coinsTuple, memo],
+    )
+    return new BN(BigNumber.from(tx).toString())
   }
 
-  private async getBalanceFromVault(yggVaultAddress: string, erc20Address: string): Promise<BigNumber> {
+  private async getBalanceFromVault(yggVaultAddress: string, erc20Address: string): Promise<BN> {
     const network = this.clients?.get('ETH')?.getNetwork() || 'testnet'
     const routerContractAddress = ETH_ROUTER_ADDRESS[network]
-
-    return BigNumber.from(
-      await this.ethClient.call<BigNumberish>(0, routerContractAddress, this.routerContract, 'vaultAllowance', [
-        yggVaultAddress,
-        erc20Address,
-      ]),
+    const value = await this.ethClient.call<BigNumberish>(
+      0,
+      routerContractAddress,
+      this.routerContract,
+      'vaultAllowance',
+      [yggVaultAddress, erc20Address],
     )
+    return new BN(BigNumber.from(value).toString())
   }
   private buildCoinTuple(erc20Txs: RecoveryTransaction[]) {
     console.log(erc20Txs)
-    return [{ asset: 'TODO', amount: 'TODO' }]
+    const tuple = erc20Txs.map((coin) => {
+      return { asset: this.parseErc20Address(coin.asset.symbol), amount: coin.amountToTransfer }
+    })
+    return tuple
   }
 
   private async getERC20Decimals(erc20Address: string): Promise<number> {

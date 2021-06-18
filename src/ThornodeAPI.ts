@@ -11,7 +11,8 @@ export class ThornodeAPI {
       this.network === 'testnet' ? 'https://testnet.thornode.thorchain.info' : 'https://thornode.thorchain.info'
   }
 
-  async getAllYggVaults() {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async getAllYggVaults(): Promise<Array<any>> {
     const resp = await Axios.get(`${this.baseUrl}/thorchain/vaults/yggdrasil`)
     return resp.data
   }
