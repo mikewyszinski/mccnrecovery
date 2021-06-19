@@ -1,16 +1,3 @@
-const XMLHttpRequest = require('xhr2')
-// Needed to support making http calls from node
-declare global {
-  // eslint-disable-next-line @typescript-eslint/no-namespace
-  namespace NodeJS {
-    interface Global {
-      XMLHttpRequest: XMLHttpRequest
-    }
-  }
-}
-global.XMLHttpRequest = XMLHttpRequest
-// Needed to support making http calls from node
-
 import { Address } from '@xchainjs/xchain-client'
 import { Chain } from '@xchainjs/xchain-util'
 import { MultiChainNodeRecovery } from './MultiChainNodeRecovery'
