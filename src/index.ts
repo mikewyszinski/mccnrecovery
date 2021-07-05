@@ -36,6 +36,13 @@ const mySeed = 'float next auto secret mixed nice comic december cycle curious e
 const recovery = new MultiChainNodeRecovery('testnet', mySeed)
 recovery.multiChainClient.addresses = testnet_addresses
 
+// NOTE: you can use a specific thornode API
+// WARNING: bsure to use a node on the correct network
+// you can use nodes listed here:
+// testnet ---> https://testnet.seed.thorchain.info/
+// mainnet ---> https://seed.thorchain.info/
+// recovery.thornodeAPI.baseUrl = 'http://3.13.89.205:1317'
+
 // -=-=--=-=-=-=-- Mainnet -=-=-=-=-=-=---=---=
 // const recovery = new MultiChainNodeRecovery('mainnet', mySeed)
 // recovery.multiChainClient.addresses = mainnet_addresses

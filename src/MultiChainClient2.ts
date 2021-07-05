@@ -58,6 +58,8 @@ export class MultiChainClient2 {
       recipient: tx.toAsgardAddress.address,
       memo: tx.memo,
     }
+    // console.log(params)
+    // return 'skipping'
     return (await client?.transfer(params)) || 'error'
   }
 
@@ -98,33 +100,33 @@ export class MultiChainClient2 {
     const coinsTuple = this.buildCoinTuple(erc20Txs)
     const walletIndex = 0 //always 0 index
 
-    const fees = await this.ethClient.estimateCall(routerContractAddress, this.routerContract, 'returnVaultAssets', [
-      routerContractAddress,
-      asgardAddress,
-      coinsTuple,
-      memo,
-    ])
+    const fees = await this.ethClient.estimateCall({
+      contractAddress: routerContractAddress,
+      abi: this.routerContract,
+      funcName: 'returnVaultAssets',
+      funcParams: [routerContractAddress, asgardAddress, coinsTuple, memo],
+    })
 
-    const tx = await this.ethClient.call<BigNumberish>(
+    const tx = await this.ethClient.call<BigNumberish>({
       walletIndex,
-      routerContractAddress,
-      this.routerContract,
-      'returnVaultAssets',
-      [fees.toNumber(), routerContractAddress, asgardAddress, coinsTuple, memo],
-    )
+      contractAddress: routerContractAddress,
+      abi: this.routerContract,
+      funcName: 'returnVaultAssets',
+      funcParams: [fees.toNumber(), routerContractAddress, asgardAddress, coinsTuple, memo],
+    })
     return new BN(BigNumber.from(tx).toString())
   }
 
   private async getBalanceFromVault(yggVaultAddress: string, erc20Address: string): Promise<BN> {
     const network = this.clients?.get('ETH')?.getNetwork() || 'testnet'
     const routerContractAddress = ETH_ROUTER_ADDRESS[network]
-    const value = await this.ethClient.call<BigNumberish>(
-      0,
-      routerContractAddress,
-      this.routerContract,
-      'vaultAllowance',
-      [yggVaultAddress, erc20Address],
-    )
+    const value = await this.ethClient.call<BigNumberish>({
+      walletIndex: 0,
+      contractAddress: routerContractAddress,
+      abi: this.routerContract,
+      funcName: 'vaultAllowance',
+      funcParams: [yggVaultAddress, erc20Address],
+    })
     return new BN(BigNumber.from(value).toString())
   }
   private buildCoinTuple(erc20Txs: RecoveryTransaction[]) {
@@ -136,7 +138,15 @@ export class MultiChainClient2 {
   }
 
   private async getERC20Decimals(erc20Address: string): Promise<number> {
-    return BigNumber.from(await this.ethClient.call<BigNumberish>(0, erc20Address, ERC20, 'decimals', [])).toNumber()
+    return BigNumber.from(
+      await this.ethClient.call<BigNumberish>({
+        walletIndex: 0,
+        contractAddress: erc20Address,
+        abi: ERC20,
+        funcName: 'decimals',
+        funcParams: [],
+      }),
+    ).toNumber()
   }
   private parseErc20Address(symbol: string) {
     //this needs to be lower cased since the ethers does not like the 0X prefix, it needs 0x

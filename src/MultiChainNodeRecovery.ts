@@ -1,28 +1,29 @@
 import { MultiChainClient2 } from './MultiChainClient2'
-import { AsgardInboundAddress, RecoveryTransaction, YggVault, YggCoin } from './types'
+import { AsgardInboundAddress, RecoveryTransaction, YggCoin } from './types'
 import { Network } from '@xchainjs/xchain-client'
 import { ThornodeAPI } from './ThornodeAPI'
 
-import { assetFromString, baseAmount, BaseAmount, Asset } from '@xchainjs/xchain-util'
-import { BigNumber } from 'bignumber.js'
-
-const THORCHAIN_DECIMALS = 8
 const isErc20 = (tx: RecoveryTransaction) => tx.asset.chain === 'ETH' && tx.asset.ticker !== 'ETH'
 const isNotErc20 = (tx: RecoveryTransaction) => !isErc20(tx)
 
 export class MultiChainNodeRecovery {
   private asgardInboundAddresses: AsgardInboundAddress[] | undefined
   private seedPhrase: string
+
   private _multiChainClient: MultiChainClient2
   public get multiChainClient(): MultiChainClient2 {
     return this._multiChainClient
   }
-  private thornodeAPI: ThornodeAPI
+
+  private _thornodeAPI: ThornodeAPI
+  public get thornodeAPI(): ThornodeAPI {
+    return this._thornodeAPI
+  }
 
   constructor(network: Network, seedPhrase: string) {
     this.seedPhrase = seedPhrase
     this._multiChainClient = new MultiChainClient2(this.seedPhrase, network)
-    this.thornodeAPI = new ThornodeAPI(network)
+    this._thornodeAPI = new ThornodeAPI(network)
     console.log(`==========================================================`)
     console.log(`               MultiChainNodeRecovery: ${network.toUpperCase()}       `)
     console.log(`==========================================================`)
@@ -59,7 +60,8 @@ export class MultiChainNodeRecovery {
 
   private async getRecoveryTransactions(thorAddress: string): Promise<Array<RecoveryTransaction>> {
     const txs: Array<RecoveryTransaction> = []
-    const myYggVault = await this.findMyYggVault(thorAddress)
+    const nodePubKey = await this.thornodeAPI.getPubKeyAndStatusSinceByThorAddress(thorAddress)
+    const myYggVault = await this.thornodeAPI.getYggVaultByNodeSecp256k1PubKey(nodePubKey)
 
     for (const coin of myYggVault?.coins) {
       if (coin.amount.gt(0)) {
@@ -70,66 +72,6 @@ export class MultiChainNodeRecovery {
       }
     }
     return txs
-  }
-  /**
-   * Thorchain has a set decimal count of 8, this function pads/rounds the correct
-   * amount to send based on the chain
-   *
-   */
-  private getCorrectAmount(amount: string, asset: Asset, decimals: number | undefined): BaseAmount {
-    let decimalsToUse: number
-    if (asset.chain === 'ETH') {
-      decimalsToUse = decimals || 18
-    } else {
-      decimalsToUse = decimals || 8
-    }
-    const amt: BigNumber = new BigNumber(amount)
-    const diff = decimalsToUse - THORCHAIN_DECIMALS
-    const amtToSend = amt.times(10 ** diff)
-    return baseAmount(amtToSend)
-  }
-
-  private async findMyYggVault(thorAddress: string): Promise<YggVault> {
-    const allYggVaults = await this.thornodeAPI.getAllYggVaults()
-    let foundVault: any
-    allYggVaults.forEach((vault) => {
-      const result = vault.addresses.find((item: any) => item.chain === 'THOR' && item.address === thorAddress)
-      if (result) {
-        foundVault = vault
-      }
-    })
-
-    if (!foundVault) {
-      throw new Error(`Couldn't find vault: ${thorAddress}`)
-    }
-    return this.createYggVault(foundVault)
-  }
-  /**
-   *
-   * Helper function to take the thornode API ygg vault and combine elements to make it easierto work with
-   *
-   * @param yggVault the ygg vault returned from thornodeAPI
-   * @returns YggVault
-   */
-  private createYggVault(yggVault: any): YggVault {
-    const coins: Array<YggCoin> = []
-    // console.log(JSON.stringify(yggVault))
-    yggVault.coins.forEach((coin: { asset: string; amount: string; decimals: number | undefined }) => {
-      const asset = assetFromString(coin.asset)
-      if (!asset) throw new Error(`Couldn't parse ${coin.asset}`)
-      const address = yggVault.addresses.find((item: any) => item.chain === asset?.chain).address
-      const amount = this.getCorrectAmount(coin.amount, asset, coin.decimals)
-      coins.push({
-        address,
-        asset,
-        amount,
-      })
-    })
-    return {
-      pubKey: yggVault.pub_key,
-      statusSince: yggVault.status_since,
-      coins,
-    }
   }
 
   private async findAsgardInboundAddress(chain: string): Promise<AsgardInboundAddress> {
