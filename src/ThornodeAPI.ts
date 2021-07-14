@@ -33,6 +33,13 @@ export class ThornodeAPI {
     const resp = await Axios.get(`${this._baseUrl}/thorchain/vault/${pubkey}`)
     return this.createYggVault(resp.data)
   }
+  async getEthRouterAddress(): Promise<string> {
+    const resp = await Axios.get(`${this._baseUrl}/thorchain/vaults/asgard`)
+    const firstAsgardVault = resp.data[0]
+    const router = firstAsgardVault.routers?.find((item: any) => item.chain === 'ETH').router
+    return router
+  }
+
   /**
    *
    * Helper function to take the thornode API ygg vault and combine elements to make it easierto work with
@@ -42,7 +49,6 @@ export class ThornodeAPI {
    */
   private createYggVault(yggVault: any): YggVault {
     const coins: Array<YggCoin> = []
-    // console.log(JSON.stringify(yggVault))
     yggVault.coins.forEach((coin: { asset: string; amount: string; decimals: number | undefined }) => {
       const asset = assetFromString(coin.asset)
       if (!asset) throw new Error(`Couldn't parse ${coin.asset}`)

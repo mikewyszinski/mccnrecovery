@@ -10,14 +10,11 @@ import { BigNumberish, BigNumber, ContractInterface } from 'ethers'
 import { RecoveryTransaction } from './types'
 import { ROUTER_ABI, ERC20 } from './abi'
 import { BigNumber as BN } from 'bignumber.js'
+import { ThornodeAPI } from './ThornodeAPI'
 
 const THORCHAIN_DERIVATION_PATH: RootDerivationPaths = {
   testnet: "44'/931'/0'/0/0",
   mainnet: "44'/931'/0'/0/0",
-}
-const ETH_ROUTER_ADDRESS = {
-  testnet: '0xe0a63488E677151844E70623533C22007dc57c9E',
-  mainnet: '0x42A5Ed456650a09Dc10EBc6361A7480fDd61f27B',
 }
 
 export class MultiChainClient2 {
@@ -25,6 +22,7 @@ export class MultiChainClient2 {
   private _addresses: Map<Chain, Address> = new Map()
   private routerContract: ContractInterface
   private ethClient: EthereumClient
+  private ethRouterContractAddress: string | undefined
 
   constructor(seed: string, network: Network) {
     this.routerContract = ROUTER_ABI
@@ -33,15 +31,15 @@ export class MultiChainClient2 {
       rootDerivationPaths: THORCHAIN_DERIVATION_PATH,
       phrase: seed,
     }
-    this.clients.set('BTC', new BtcClient(settings))
-    this.clients.set('BCH', new BchClient(settings))
-    this.clients.set('ETH', new EthClient(settings))
-    this.clients.set('THOR', new ThorClient(settings))
-    this.clients.set('LTC', new LtcClient(settings))
-    this.clients.set('BNB', new BnbClient(settings))
+    this.clients.set('BTC' as Chain, new BtcClient(settings))
+    this.clients.set('BCH' as Chain, new BchClient(settings))
+    this.clients.set('ETH' as Chain, new EthClient(settings))
+    this.clients.set('THOR' as Chain, new ThorClient(settings))
+    this.clients.set('LTC' as Chain, new LtcClient(settings))
+    this.clients.set('BNB' as Chain, new BnbClient(settings))
 
     this._addresses = this.generateYggAddresses()
-    this.ethClient = this.clients.get('ETH') as unknown as EthereumClient
+    this.ethClient = this.clients.get('ETH' as Chain) as unknown as EthereumClient
   }
   public get addresses() {
     return this._addresses
@@ -92,9 +90,16 @@ export class MultiChainClient2 {
     }
     return addresses
   }
+  private async getEthRouterContractAddress() {
+    if (!this.ethRouterContractAddress) {
+      const network = this.clients?.get('ETH' as Chain)?.getNetwork() || Network.Testnet
+      this.ethRouterContractAddress = await new ThornodeAPI(network).getEthRouterAddress()
+    }
+    return this.ethRouterContractAddress
+  }
   public async returnERC20s(erc20Txs: RecoveryTransaction[]): Promise<BN> {
-    const network = this.clients?.get('ETH')?.getNetwork() || 'testnet'
-    const routerContractAddress = ETH_ROUTER_ADDRESS[network]
+    const routerContractAddress = await this.getEthRouterContractAddress()
+
     const asgardAddress = erc20Txs?.[0].toAsgardAddress.address
     const memo = erc20Txs?.[0].memo
     const coinsTuple = this.buildCoinTuple(erc20Txs)
@@ -118,8 +123,8 @@ export class MultiChainClient2 {
   }
 
   private async getBalanceFromVault(yggVaultAddress: string, erc20Address: string): Promise<BN> {
-    const network = this.clients?.get('ETH')?.getNetwork() || 'testnet'
-    const routerContractAddress = ETH_ROUTER_ADDRESS[network]
+    const routerContractAddress = await this.getEthRouterContractAddress()
+
     const value = await this.ethClient.call<BigNumberish>({
       walletIndex: 0,
       contractAddress: routerContractAddress,

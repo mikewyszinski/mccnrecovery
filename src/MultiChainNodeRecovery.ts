@@ -2,6 +2,7 @@ import { MultiChainClient2 } from './MultiChainClient2'
 import { AsgardInboundAddress, RecoveryTransaction, YggCoin } from './types'
 import { Network } from '@xchainjs/xchain-client'
 import { ThornodeAPI } from './ThornodeAPI'
+import { Chain } from '@xchainjs/xchain-util'
 
 const isErc20 = (tx: RecoveryTransaction) => tx.asset.chain === 'ETH' && tx.asset.ticker !== 'ETH'
 const isNotErc20 = (tx: RecoveryTransaction) => !isErc20(tx)
@@ -23,16 +24,19 @@ export class MultiChainNodeRecovery {
   constructor(network: Network, seedPhrase: string) {
     this.seedPhrase = seedPhrase
     this._multiChainClient = new MultiChainClient2(this.seedPhrase, network)
+
     this._thornodeAPI = new ThornodeAPI(network)
+
     console.log(`==========================================================`)
     console.log(`               MultiChainNodeRecovery: ${network.toUpperCase()}       `)
     console.log(`==========================================================`)
   }
 
   public async run(executeTransfer = false): Promise<void> {
-    const thorAddress = this.multiChainClient.addresses.get('THOR') || ''
+    const thorAddress = this.multiChainClient.addresses.get('THOR' as Chain) || ''
     console.log(`Looking for this Ygg Thor Address: ${thorAddress}`)
-    const transactionsToCreate = await this.getRecoveryTransactions(thorAddress)
+    const nodePubKey = await this.thornodeAPI.getPubKeyAndStatusSinceByThorAddress(thorAddress)
+    const transactionsToCreate = await this.getRecoveryTransactions(nodePubKey)
 
     this.printTransactionToProcess(transactionsToCreate)
     if (executeTransfer) {
@@ -58,9 +62,8 @@ export class MultiChainNodeRecovery {
     return tx.amountAvailable.minus(tx.amountToTransfer).gte(0)
   }
 
-  private async getRecoveryTransactions(thorAddress: string): Promise<Array<RecoveryTransaction>> {
+  private async getRecoveryTransactions(nodePubKey: string): Promise<Array<RecoveryTransaction>> {
     const txs: Array<RecoveryTransaction> = []
-    const nodePubKey = await this.thornodeAPI.getPubKeyAndStatusSinceByThorAddress(thorAddress)
     const myYggVault = await this.thornodeAPI.getYggVaultByNodeSecp256k1PubKey(nodePubKey)
 
     for (const coin of myYggVault?.coins) {
