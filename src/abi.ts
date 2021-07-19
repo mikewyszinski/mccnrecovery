@@ -1,5 +1,9 @@
 export const ROUTER_ABI = [
-  { inputs: [], stateMutability: 'nonpayable', type: 'constructor' },
+  {
+    inputs: [{ internalType: 'address', name: 'rune', type: 'address' }],
+    stateMutability: 'nonpayable',
+    type: 'constructor',
+  },
   {
     anonymous: false,
     inputs: [
@@ -89,6 +93,19 @@ export const ROUTER_ABI = [
       { internalType: 'string', name: 'memo', type: 'string' },
     ],
     name: 'deposit',
+    outputs: [],
+    stateMutability: 'payable',
+    type: 'function',
+  },
+  {
+    inputs: [
+      { internalType: 'address payable', name: 'vault', type: 'address' },
+      { internalType: 'address', name: 'asset', type: 'address' },
+      { internalType: 'uint256', name: 'amount', type: 'uint256' },
+      { internalType: 'string', name: 'memo', type: 'string' },
+      { internalType: 'uint256', name: 'expiration', type: 'uint256' },
+    ],
+    name: 'depositWithExpiry',
     outputs: [],
     stateMutability: 'payable',
     type: 'function',
