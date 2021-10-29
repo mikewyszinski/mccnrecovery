@@ -69,7 +69,8 @@ export class MultiChainNodeRecovery {
     for (const coin of myYggVault?.coins) {
       if (coin.amount.gt(0)) {
         const tx = await this.createRecoveryTransaction(coin, myYggVault.statusSince)
-        txs.push(tx)
+        //TODO remove this after fixing issue with binance
+        if (coin.asset.chain !== Chain.Binance) txs.push(tx)
       } else {
         console.log(`Nothing to send back to asgard for ${coin.asset.symbol}, skipping...`)
       }
