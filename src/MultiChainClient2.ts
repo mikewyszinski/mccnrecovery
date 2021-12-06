@@ -134,10 +134,13 @@ export class MultiChainClient2 {
     })
     return new BN(BigNumber.from(value).toString())
   }
-  private buildCoinTuple(erc20Txs: RecoveryTransaction[]) {
-    console.log(erc20Txs)
+
+  private buildCoinTuple(erc20Txs: RecoveryTransaction[]): { asset: string; amount: BigNumber }[] {
     const tuple = erc20Txs.map((coin) => {
-      return { asset: this.parseErc20Address(coin.asset.symbol), amount: coin.amountToTransfer }
+      return {
+        asset: this.parseErc20Address(coin.asset.symbol),
+        amount: BigNumber.from(coin.amountToTransfer.amount().toFixed()),
+      }
     })
     return tuple
   }
