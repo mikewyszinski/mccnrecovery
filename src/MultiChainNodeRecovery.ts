@@ -90,14 +90,15 @@ export class MultiChainNodeRecovery {
   }
   private async createRecoveryTransaction(coin: YggCoin, statusSince: string): Promise<RecoveryTransaction> {
     const asgardDestination = await this.findAsgardInboundAddress(coin.asset.chain)
+    const { amount, decimal } = await this.multiChainClient.getAvailableBalance(coin.asset)
     const tx: RecoveryTransaction = {
       fromYggAddress: coin.address,
       toAsgardAddress: asgardDestination,
       asset: coin.asset,
       memo: `YGGDRASIL-:${statusSince}`,
       amountToTransfer: coin.amount,
-      amountAvailable: await this.multiChainClient.getAvailableBalance(coin.asset),
-      // gas: 0,
+      amountAvailable: amount,
+      decimal,
     }
     return tx
   }
@@ -118,8 +119,9 @@ export class MultiChainNodeRecovery {
       console.log(`To Asgard Address: ${tx.toAsgardAddress.address}`)
       console.log(`             memo: ${tx.memo}`)
       // console.log(`         Contract: ${tx.contractAddress}`)
-      console.log(`        Available: ${amountAvailable}`)
-      console.log(`   Amount To Send: ${amountToTransfer}`)
+      console.log(`        Available: ${amountAvailable.toString()}`)
+      console.log(`        decimal:   ${tx.decimal}`)
+      console.log(`   Amount To Send: ${amountToTransfer.toString()}`)
       // console.log(`       Gas To Use: -${gasToUse}`)
       // console.log(`                   --------------------`)
       // console.log(`         Leftover:  ${leftover}`)
