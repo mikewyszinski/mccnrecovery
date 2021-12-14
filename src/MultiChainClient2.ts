@@ -61,25 +61,25 @@ export class MultiChainClient2 {
     return (await client?.transfer(params)) || 'error'
   }
 
-  public async getAvailableBalance(asset: Asset): Promise<BaseAmount> {
+  public async getAvailableBalance(asset: Asset): Promise<{ amount: BaseAmount; decimal: number }> {
     const client = this.clients.get(asset.chain)
     const yggVaultAddress = this.addresses.get(asset.chain) || ''
     if (asset.chain === 'ETH' && asset.ticker !== 'ETH') {
       //ERC20 coins have unique way to get vault balance
       const erc20Address = this.parseErc20Address(asset.symbol)
-      const decimals = await this.getERC20Decimals(erc20Address)
+      const decimal = await this.getERC20Decimals(erc20Address)
       const amount = await this.getBalanceFromVault(yggVaultAddress, erc20Address)
 
-      return baseAmount(amount.toFixed(decimals))
+      return { amount: baseAmount(amount.toFixed(decimal)), decimal }
     } else {
       // all other coins can use the getBalance Function
       const balances = await client?.getBalance(yggVaultAddress, [asset])
 
       if (balances && balances.length > 0) {
         // if (asset.chain === 'ETH') console.log(balances[0].amount.amount())
-        return balances[0].amount
+        return { amount: balances[0].amount, decimal: balances[0].amount.decimal }
       } else {
-        return baseAmount(-1)
+        return { amount: baseAmount(-1), decimal: NaN }
       }
     }
   }
@@ -134,6 +134,7 @@ export class MultiChainClient2 {
     })
     return new BN(BigNumber.from(value).toString())
   }
+
   private buildCoinTuple(erc20Txs: RecoveryTransaction[]) {
     console.log(erc20Txs)
     const tuple = erc20Txs.map((coin) => {
@@ -153,6 +154,7 @@ export class MultiChainClient2 {
       }),
     ).toNumber()
   }
+
   private parseErc20Address(symbol: string) {
     //this needs to be lower cased since the ethers does not like the 0X prefix, it needs 0x
     return symbol.split('-')[1].toLowerCase()
