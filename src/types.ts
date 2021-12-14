@@ -8,7 +8,7 @@ export type RecoveryTransaction = {
   amountToTransfer: BaseAmount
   amountAvailable: BaseAmount
   memo: string
-  // gas: number
+  decimal: number
 }
 export type YggCoin = {
   address: Address
