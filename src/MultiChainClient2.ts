@@ -83,6 +83,7 @@ export class MultiChainClient2 {
       }
     }
   }
+
   private generateYggAddresses(): Map<Chain, Address> {
     const addresses: Map<Chain, Address> = new Map()
     for (const [chain, client] of this.clients) {
@@ -105,19 +106,12 @@ export class MultiChainClient2 {
     const coinsTuple = this.buildCoinTuple(erc20Txs)
     const walletIndex = 0 //always 0 index
 
-    const fees = await this.ethClient.estimateCall({
-      contractAddress: routerContractAddress,
-      abi: this.routerContract,
-      funcName: 'returnVaultAssets',
-      funcParams: [routerContractAddress, asgardAddress, coinsTuple, memo],
-    })
-
     const tx = await this.ethClient.call<BigNumberish>({
       walletIndex,
       contractAddress: routerContractAddress,
       abi: this.routerContract,
       funcName: 'returnVaultAssets',
-      funcParams: [fees.toNumber(), routerContractAddress, asgardAddress, coinsTuple, memo],
+      funcParams: [routerContractAddress, asgardAddress, coinsTuple, memo],
     })
     return new BN(BigNumber.from(tx).toString())
   }
